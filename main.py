@@ -64,7 +64,14 @@ def train_command(scale, batch_size, device, epoch, log_interval, checkpoint_fil
         scale=scale,
         dropout=dropout,
         use_subspectral=subspectral_norm,
-    ).to(device)
+    )
+
+    # Check for multiple GPUs and wrap the model in DataParallel if available
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs")
+        model = torch.nn.DataParallel(model)  # Wrap the model for multi-GPU training
+
+    model = model.to(device)
 
     train_loader = torch.utils.data.DataLoader(
         get_data.SubsetSC(subset="training"),
@@ -114,75 +121,6 @@ def train_command(scale, batch_size, device, epoch, log_interval, checkpoint_fil
         n_epoch=epoch,
         log_interval=log_interval
     )
-
-
-@cli.command("test", help="Test model accuracy on test set")
-@click.option("--model-file", type=str, help="path to model weights")
-@click.option("--scale", type=int, default=1, help="model width will be multiplied by scale")
-@click.option("--batch-size", type=int, default=256, help="batch size")
-@click.option("--device", type=str, default=util.get_device(), help="`cuda` or `cpu`")
-@click.option("--dropout", type=float, default=0.1, help="dropout")
-@click.option("--subspectral-norm/--dropout-norm", type=bool, default=True, help="use SubspectralNorm or Dropout")
-def test_command(model_file, scale, batch_size, device, dropout, subspectral_norm):
-    if not os.path.exists(model_file):
-        raise FileExistsError(f"model {model_file} not exists")
-
-    if device == "cuda":
-        num_workers = 1
-        pin_memory = True
-    else:
-        num_workers = 0
-        pin_memory = False
-
-    print(f"Device: {device}")
-    print(f"Use subspectral norm: {subspectral_norm}")
-
-    model = bc_resnet_model.BcResNetModel(
-        n_class=get_data.N_CLASS,
-        scale=scale,
-        dropout=dropout,
-        use_subspectral=subspectral_norm,
-    ).to(device)
-    model.load_state_dict(torch.load(model_file))
-
-    test_loader = torch.utils.data.DataLoader(
-        get_data.SubsetSC(subset="testing"),
-        batch_size=batch_size,
-        shuffle=False,
-        drop_last=False,
-        collate_fn=get_data.collate_fn,
-        num_workers=num_workers,
-        pin_memory=pin_memory
-    )
-    test_score = apply.apply(model, test_loader, device)
-    print(f"Test accuracy: {test_score}")
-
-
-@cli.command("apply", help="Apply model to wav file")
-@click.option("--model-file", type=str, help="path to model weights")
-@click.option("--wav-file", type=str, help="path to wav sound file")
-@click.option("--scale", type=int, default=1, help="model width will be multiplied by scale")
-@click.option("--device", type=str, default=util.get_device(), help="`cuda` or `cpu`")
-@click.option("--dropout", type=float, default=0.1, help="dropout")
-@click.option("--subspectral-norm/--dropout-norm", type=bool, default=True, help="use SubspectralNorm or Dropout")
-def apply_command(model_file, wav_file, scale, device, dropout, subspectral_norm):
-    if not os.path.exists(model_file):
-        raise FileExistsError(f"model file {model_file} not exists")
-    if not os.path.exists(wav_file):
-        raise FileExistsError(f"sound file {wav_file} not exists")
-
-    model = bc_resnet_model.BcResNetModel(
-        n_class=get_data.N_CLASS,
-        scale=scale,
-        dropout=dropout,
-        use_subspectral=subspectral_norm,
-    ).to(device)
-    model.load_state_dict(torch.load(model_file))
-    model.eval()
-
-    predictions = apply.apply_to_file(model, wav_file, device)
-    for label, prob in predictions[:5]:
-        print(f"{label}\t{prob:.5f}")
 
 
 if __name__ == "__main__":
