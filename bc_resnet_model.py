@@ -101,50 +101,29 @@ class BcResNetModel(nn.Module):
         self.head_conv = nn.Conv2d(32*scale, n_class, kernel_size=1)
     
     def forward(self, x: torch.Tensor):
-        print(f"Input shape: {x.shape}")
         x = self.input_conv(x)
-        print(f"After input_conv: {x.shape}")
-        
         x = self.t1(x)
-        print(f"After t1: {x.shape}")
         x = self.n11(x)
-        print(f"After n11: {x.shape}")
-    
+
         x = self.t2(x)
-        print(f"After t2: {x.shape}")
         x = self.n21(x)
-        print(f"After n21: {x.shape}")
-    
+
         x = self.t3(x)
-        print(f"After t3: {x.shape}")
         x = self.n31(x)
-        print(f"After n31: {x.shape}")
         x = self.n32(x)
-        print(f"After n32: {x.shape}")
         x = self.n33(x)
-        print(f"After n33: {x.shape}")
-    
+
         x = self.t4(x)
-        print(f"After t4: {x.shape}")
         x = self.n41(x)
-        print(f"After n41: {x.shape}")
         x = self.n42(x)
-        print(f"After n42: {x.shape}")
         x = self.n43(x)
-        print(f"After n43: {x.shape}")
-    
+
         x = self.dw_conv(x)
-        print(f"After dw_conv: {x.shape}")
         x = self.onexone_conv(x)
-        print(f"After onexone_conv: {x.shape}")
-    
+
         x = torch.mean(x, dim=3, keepdim=True)
-        print(f"After mean along dim 3: {x.shape}")
-        
         x = self.head_conv(x)
-        print(f"After head_conv: {x.shape}")
-    
+
         x = x.squeeze()
-        print(f"After squeeze: {x.shape}")
-    
+
         return F.log_softmax(x, dim=-1)
